@@ -49,7 +49,7 @@ class LineReg():
     self.best_metric = 0.0
 
   def __str__(self):
-    return f'MyLineReg class: n_iter={self.n_iter}, learning_rate={self.learning_rate}, metric={self.metric}, regularization={self.reg}'
+    return f'LineReg class: n_iter={self.n_iter}, learning_rate={self.learning_rate}, metric={self.metric}, regularization={self.reg}'
 
   def calc_metric(self, y, y_pred, num_observations) -> float:
     """Подсчет метрики для оценки точности модели"""
