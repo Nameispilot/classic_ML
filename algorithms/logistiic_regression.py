@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-class MyLogReg():
+class LogReg():
     def __init__(self, n_iter: int = 10, learning_rate: float = 0.1, metric: str = None):
         self.n_iter = n_iter
         self.learning_rate = learning_rate
@@ -10,7 +10,7 @@ class MyLogReg():
         self.best_metric = 0.0
 
     def __str__(self):
-        return f'MyLogReg class: n_iter={self.n_iter}, learning_rate={self.learning_rate}'    
+        return f'LogReg class: n_iter={self.n_iter}, learning_rate={self.learning_rate}'    
     
     def loss(self, loss: str = 'LogLoss', y: pd.Series = None, y_pred : pd.Series = None, n: int = 1) -> float  :
         if loss == 'LogLoss':
@@ -20,7 +20,7 @@ class MyLogReg():
         if loss == 'LogLoss':
             return (y_pred - y).dot(X) / X.shape[0] 
 
-    def metric_marks(self, y, y_pred) -> list[int]:
+    def metric_marks(self, y, y_pred) -> list:
         tp =  ((y == 1) & (y_pred == 1)).sum()  
         tn = ((y == 0) & (y_pred == 0)).sum()
         fn = ((y == 1) & (y_pred == 0)).sum()
@@ -82,18 +82,16 @@ class MyLogReg():
         return self.weights[1:]   
 
     def predict_proba(self, X: pd.DataFrame = None) -> pd.Series: 
-        """Предсказание в виде logits"""
         X = X.copy()
         X.insert(0, 'w0', 1.0)
         return  1 / (1 + np.exp(-X.dot(self.weights)))
     
     def predict(self, X: pd.DataFrame = None) -> pd.Series:
-        """Предсказание в виде labels"""
         proba = self.predict_proba(X)
         return (proba > 0.5).astype(int)  
 
     def get_best_score(self):
-        return self.best_metric     
+        return self.best_metric  
 
 """Данные для тестов"""
 from sklearn.datasets import make_classification
