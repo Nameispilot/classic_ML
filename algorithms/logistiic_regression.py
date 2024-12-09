@@ -27,7 +27,8 @@ class LogReg():
         fp = ((y == 0) & (y_pred == 1)).sum()
         return [tp, tn, fn, fp]
 
-    def calc_metric(self, metric: str = 'accuracy', y: pd.Series = None, y_pred: pd.Series = None):
+    def calc_metric(self, y: pd.Series = None, y_pred: pd.Series = None):
+        metric = self.metric
         labels = (y_pred > 0.5).astype(int)
         tp, tn, fn, fp  = self.metric_marks(y, labels) # returns as following: [tp, tn, fn, fp] 
         if metric == 'accuracy':
@@ -101,7 +102,7 @@ X = pd.DataFrame(X)
 y = pd.Series(y)
 X.columns = [f'col_{col}' for col in X.columns]           
 
-reg = MyLogReg(n_iter=130, learning_rate=0.03, metric='roc_auc')
+reg = LogReg(n_iter=130, learning_rate=0.03, metric='roc_auc')
 reg.fit(X, y, verbose=False)
 print(reg.get_best_score())
 
