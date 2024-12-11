@@ -108,7 +108,8 @@ class LineReg():
       sample_rows_idx = random.sample(range(X.shape[0]), batch_size)
       X_batch = X.iloc[sample_rows_idx]
       y_batch = y.iloc[sample_rows_idx]
-      y_pred = X_batch.dot(weights)
+      y_pred = X.dot(weights)
+      y_pred_batch = X_batch.dot(weights)
 
       """Регуляризация"""
       reg_loss, reg_grad = 0.0, 0.0
@@ -123,7 +124,7 @@ class LineReg():
 
       """Расчет градиента и обновление весов"""
       mse = ((y_pred - y)**2).sum() / num_observations + reg_loss
-      grad = 2 * (y_pred - y_batch).dot(X_batch) / num_observations + reg_grad
+      grad = 2 * (y_pred_batch - y_batch).dot(X_batch) / num_observations + reg_grad
       weights = weights - lr*grad
       self.weights = weights
 
@@ -139,7 +140,8 @@ class LineReg():
 
   def predict(self, X: pd.DataFrame):
     """Выдача предсказания после обучение"""
-    X.insert(0, 'w0', 1.0)
+    if X.shape[1] != self.weights.shape[0]:
+            X.insert(0, 'w0', 1.0)
     return X.dot(self.weights)
 
   def get_coef(self) -> np.array:
