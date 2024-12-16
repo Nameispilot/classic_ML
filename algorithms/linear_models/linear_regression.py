@@ -153,10 +153,15 @@ class LineReg():
     return self.best_metric
 
 """Данные для тестов"""
-X, y = make_regression(n_samples=1000, n_features=14, n_informative=10, noise=15, random_state=42)
-X = pd.DataFrame(X)
-y = pd.Series(y)
-X.columns = [f'col_{col}' for col in X.columns]  
+from sklearn.datasets import make_regression
+X, y = make_regression(n_samples=300, n_features=5, n_informative=2, random_state=42)
+X_train = pd.DataFrame(X[:200])
+y_train = pd.Series(y[:200])
+X_train.columns = [f'col_{col}' for col in X_train.columns]
+
+X_test = pd.DataFrame(X[201:])
+X_test.columns = [f'col_{col}' for col in X_test.columns]
 
 reg = LineReg(n_iter=100, learning_rate=lambda iter: 0.5 * (0.85 ** iter), metric='mse', sgd_sample=0.1)
-reg.fit(X, y, verbose=10)
+reg.fit(X_train, y_train, verbose=10)
+print(reg.predict(X_test).sum())

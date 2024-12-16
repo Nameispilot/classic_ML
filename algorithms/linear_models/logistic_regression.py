@@ -34,16 +34,19 @@ class LogReg():
             return (y_pred - y).dot(X) / X.shape[0] 
     
     def precision(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
+        y_pred = (y_pred > 0.5).astype(int)
         tp = ((y == 1) & (y_pred == 1)).sum()
         fp = ((y == 0) & (y_pred == 1)).sum()
         return tp / (tp + fp)
     
     def recall(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
+        y_pred = (y_pred > 0.5).astype(int)
         tp = ((y == 1) & (y_pred == 1)).sum()
         fn = ((y == 1) & (y_pred == 0)).sum()
         return tp / (tp + fn)
         
     def accuracy(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
+        y_pred = (y_pred > 0.5).astype(int)
         return (y == y_pred).mean()
 
     def roc_auc(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
@@ -95,6 +98,7 @@ class LogReg():
             X_batch = X.iloc[sample_rows_idx]
             y_batch = y.iloc[sample_rows_idx]
             y_pred = 1 / (1 + np.exp(-X.dot(weights)))
+            
             y_pred_batch = 1 / (1 + np.exp(-X_batch.dot(weights)))
 
             """Регуляризация"""
@@ -151,8 +155,9 @@ X_train.columns = [f'col_{col}' for col in X_train.columns]
 X_test = pd.DataFrame(X[201:])
 X_test.columns = [f'col_{col}' for col in X_test.columns]   
 
-reg = LogReg(n_iter=100, learning_rate=lambda iter: 0.5 * (0.85 ** iter), metric='precision', sgd_sample=0.1)
-reg.fit(X, y, verbose=10)
+reg = LogReg(n_iter=100, learning_rate=lambda iter: 0.5 * (0.85 ** iter), metric='recall', sgd_sample=0.1)
+reg.fit(X_train, y_train, verbose=10)
+print(reg.predict(X_test).sum())
 
 
         
