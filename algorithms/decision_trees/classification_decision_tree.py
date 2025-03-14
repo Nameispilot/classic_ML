@@ -49,11 +49,12 @@ class TreeClf:
         col_name = None
         best_ig = float('-inf')
         best_gini = float('+inf')
+        best_gain = 0.0
         split_value = None
 
         # Рассчитываем энтропию до разделения
         if self.criterion == 'entropy':
-            s0 = self._calculate_entropy(y)
+            s0 = self._entropy(y)
 
         for feature in range(X.shape[1]):
             if self.bins is not None:
@@ -81,6 +82,7 @@ class TreeClf:
                     ig =  s0 - (n_left/n_total * entropy_left + n_right/n_total * entropy_right)
                     if ig > best_ig:
                         best_ig = ig
+                        best_gain = best_ig
                         col_name = X.columns[feature]
                         split_value = thresh
 
@@ -95,11 +97,12 @@ class TreeClf:
                     gini = n_left/n_total*gini_left + n_right/n_total*gini_right
                     if gini < best_gini:
                         best_gini = gini
+                        best_gain = best_gini
                         col_name = X.columns[feature]
                         split_value = thresh
                 else:  
                     raise ValueError("Неправильно выбрано правило для узла!")      
-        return col_name, split_value
+        return col_name, split_value, best_gain
 
     def _calculate_feature_splits(self, X: pd.DataFrame):
         for feature in range(X.shape[1]):
@@ -110,12 +113,14 @@ class TreeClf:
                 _, bin_edges = np.histogram(X.iloc[:, feature], bins=self.bins)
                 self.feature_splits[feature] = bin_edges[1:-1] # Исключаем крайние значения
 
-    def fit(self, X: pd.DataFrame, y: pd.Series):
+    def fit(self, X: pd.DataFrame, y: pd.Series, N):
         self.tree = None
         self.N = X.shape[0]
-        # Инициализация важности фичей
-        for feature in X.columns:
-            self.fi[feature] = 0.0
+        if self.N == None:
+            self.N = X.shape[0]
+        else:
+            self.N = N
+        self.fi = { col: 0 for col in X.columns }
         if self.bins is not None:
              self._calculate_feature_splits(X)
         self.tree = self.build_tree(self.tree, X, y)
@@ -123,7 +128,7 @@ class TreeClf:
     def build_tree(self, root, X_node, y_node, side='root', depth=0):
             if root is None:
                 root = Node()
-            col_name, best_threshold = self.get_best_split(X_node, y_node)
+            col_name, best_threshold, ig = self.get_best_split(X_node, y_node)
 
             class_prob = 0
             if len(y_node):
@@ -148,6 +153,8 @@ class TreeClf:
             root.value_split = best_threshold
             self.leafs_cnt += 1
             
+            self.fi[col_name] += ig * len(y_node) / self.N 
+
             left_indices = X_node[col_name] <= best_threshold
             right_indices = X_node[col_name] > best_threshold
 
@@ -156,22 +163,6 @@ class TreeClf:
 
             root.left = self.build_tree(root.left, X_left, y_left, 'left', depth + 1)
             root.right = self.build_tree(root.right, X_right, y_right, 'right', depth + 1)
-
-            if self.criterion == 'gini':
-                I = self._gini_index(y_node)
-                I_l = self._gini_index(y_node[left_indices])
-                I_r = self._gini_index(y_node[right_indices])
-            else:
-                I = self._entropy(y_node)
-                I_l = self._entropy(y_node[left_indices])
-                I_r = self._entropy(y_node[right_indices])    
-
-            N_p = X_node.shape[0]
-            N_l = len(X_node[left_indices])
-            N_r = len(X_node[right_indices])
-
-            FI = (N_p / self.N) * (I - (N_l / N_p) * I_l - (N_r / N_p) * I_r)
-            self.fi[col_name] += FI
 
             return root    
     
@@ -202,24 +193,3 @@ class TreeClf:
                 self.print_tree(node.right, depth + 1)
         else:
             print(f"{'1.' * depth}{node.side} = {node.value_leaf}")
-
-from sklearn.datasets import make_classification
-
-X, y = make_classification(n_samples=100, n_features=20, n_informative=10, random_state=42)
-X = pd.DataFrame(X)
-y = pd.Series(y)
-X.columns = [f'col_{col}' for col in X.columns]
-
-'''df = pd.read_csv('banknote+authentication.zip', header=None)
-df.columns = ['variance', 'skewness', 'curtosis', 'entropy', 'target']
-X, y = df.iloc[:,:4], df['target']'''
-
-'''tree = TreeClf(max_depth=3, min_samples_split=2, max_leafs=5, bins=None, criterion='gini')
-
-tree.fit(X, y)
-print(tree.leafs_cnt)
-print(tree.sum_tree_values)
-tree.print_tree()
-'''
-'''print(tree.predict(X))
-print(tree.predict_proba(X))'''

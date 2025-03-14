@@ -17,11 +17,12 @@ class TreeReg :
         self.max_leafs = max_leafs
         self.leafs_cnt = None
         self.bins = bins
-
+        
         self.tree =  None
         self.leafs_cnt = 1
         self.feature_splits = {}
         self.fi = {}
+        self.N = None
         self.sum_tree_values = 0
 
     def __str__(self):
@@ -65,7 +66,7 @@ class TreeReg :
                     #col_name = feature
                     split_value = thresh
                     best_mse = mse_t
-        return col_name, split_value   
+        return col_name, split_value, best_mse 
 
     def _calculate_feature_splits(self, X: pd.DataFrame):
         for feature in range(X.shape[1]):
@@ -76,27 +77,21 @@ class TreeReg :
                 _, bin_edges = np.histogram(X.iloc[:, feature], bins=self.bins)
                 self.feature_splits[feature] = bin_edges[1:-1] # Исключаем крайние значения
 
-    def fit(self, X: pd.DataFrame, y: pd.Series):       
+    def fit(self, X: pd.DataFrame, y: pd.Series, N=None):       
         self.tree = None
-        self.N = X.shape[0]
-        # Инициализация важности фичей
-        for feature in X.columns:
-            self.fi[feature] = 0.0
+        if self.N == None:
+            self.N = X.shape[0]
+        else:
+            self.N = N    
+        self.fi = {col: 0 for col in X.columns}
         if self.bins is not None:
              self._calculate_feature_splits(X)
+
         self.tree = self.build_tree(self.tree, X, y)
 
     def build_tree(self, root, X_node, y_node, side='root', depth=0):
         if root is None:
             root = Node()
-        col_name, best_threshold = self.get_best_split(X_node, y_node)   
-
-        # Если разделение невозможно (нет разделителей), создаем лист
-        if best_threshold is None:
-            root.side = side
-            root.value_leaf = np.mean(y_node)
-            self.sum_tree_values += root.value_leaf 
-            return root
 
         if len(y_node.unique()) == 1 or depth >= self.max_depth or \
             len(y_node) < self.min_samples_split or \
@@ -105,10 +100,21 @@ class TreeReg :
             root.value_leaf = np.mean(y_node)
             self.sum_tree_values += root.value_leaf 
             return root
+        
+        col_name, best_threshold, gain = self.get_best_split(X_node, y_node)   
+
+        # Если разделение невозможно (нет разделителей), создаем лист
+        if best_threshold is None:
+            root.side = side
+            root.value_leaf = np.mean(y_node)
+            self.sum_tree_values += root.value_leaf 
+            return root
             
         root.feature = col_name
         root.value_split = best_threshold
         self.leafs_cnt += 1
+
+        self.fi[col_name] += gain * len(y_node) / self.N
             
         left_indices = X_node[col_name] <= best_threshold
         right_indices = X_node[col_name] > best_threshold
@@ -119,17 +125,6 @@ class TreeReg :
         root.left = self.build_tree(root.left, X_left, y_left, 'left', depth + 1)
         root.right = self.build_tree(root.right, X_right, y_right, 'right', depth + 1)
 
-        I = self._mse(y_node)
-        I_l = self._mse(y_node[left_indices])
-        I_r = self._mse(y_node[right_indices])    
-
-        N_p = X_node.shape[0]
-        N_l = len(X_node[left_indices])
-        N_r = len(X_node[right_indices])
-
-        FI = (N_p / self.N) * (I - (N_l / N_p) * I_l - (N_r / N_p) * I_r)
-        self.fi[col_name] += FI
-        
         return root   
      
     def predict(self, X: pd.DataFrame):
@@ -155,16 +150,3 @@ class TreeReg :
                 self.print_tree(node.right, depth + 1)
         else:
             print(f"{'1.' * depth}{node.side} = {node.value_leaf}")
-
-'''from sklearn.datasets import load_diabetes
-
-data = load_diabetes(as_frame=True)
-X, y = data['data'], data['target']
-
-tree = TreeReg(max_depth=3, min_samples_split=2, max_leafs=5, bins=None)
-
-tree.fit(X, y)
-print(tree.leafs_cnt)
-print(tree.sum_tree_values)
-
-tree.predict(X)'''
