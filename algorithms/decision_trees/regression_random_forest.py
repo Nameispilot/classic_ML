@@ -59,4 +59,3 @@ X.columns = [f'col_{col}' for col in X.columns]
 forest = MyForestReg(n_estimators=6, max_depth=2, max_features=0.6, max_samples=0.5)            
 forest.fit(X, y)
 forest.predict(X)
-print(forest.fi)

@@ -48,6 +48,25 @@ class MyForestClf:
 
             self.leafs_cnt += tree.leafs_cnt 
 
+    def predict(self, X: pd.DataFrame, type: str):
+        if type == 'mean':
+            proba = self.predict_proba(X)
+            return (proba > 0.5).astype(int)
+        elif type == 'vote':
+            all_predictions = np.array([tree.predict(X) for tree in self.forest_structure]).T
+            result = []
+            for row in all_predictions:
+                values, counts = np.unique(row, return_counts=True)
+                max_count = np.max(counts)
+                candidates = values[counts == max_count]
+                result.append(np.min(candidates))
+            return np.array(result)    
+        else:
+            raise ValueError("Неправильно выбранный type!")
+
+    def predict_proba(self, X: pd.DataFrame):
+        return np.array([tree.predict_proba(X) for tree in self.forest_structure]).mean(axis=0)
+
 
 from sklearn.datasets import make_classification
 
@@ -58,4 +77,5 @@ X.columns = [f'col_{col}' for col in X.columns]
 
 forest = MyForestClf(n_estimators=6, max_depth=2, max_features=0.6, max_samples=0.5)            
 forest.fit(X, y)
+print(forest.predict(X, type='vote'))
 
