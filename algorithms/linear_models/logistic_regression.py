@@ -48,6 +48,13 @@ class LogReg():
     def accuracy(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
         y_pred = (y_pred > 0.5).astype(int)
         return (y == y_pred).mean()
+    
+    def f1(self, y_true: pd.Series = None, y_pred: pd.Series = None) -> float:
+        precision = self._precision(y_true, y_pred)
+        recall = self._recall(y_true, y_pred)
+        if precision + recall == 0:
+            return 0
+        return 2 * (precision * recall) / (precision + recall)
 
     def roc_auc(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
         y_pred = y_pred.round(10)

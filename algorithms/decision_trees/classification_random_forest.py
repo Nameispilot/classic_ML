@@ -29,6 +29,53 @@ class MyForestClf:
             max_samples={self.max_samples}, max_depth={self.max_depth}, min_samples_split={self.min_samples_split}, \
                 max_leafs={self.max_leafs}, bins={self.bins}, criterion={self.criterion}, random_state={self.random_state}"
 
+    def _precision(self, y_true, y_pred):
+        y_pred = (y_pred > 0.5).astype(int)
+        tp = ((y_true == 1) & (y_pred == 1)).sum()
+        fp = ((y_true == 0) & (y_pred == 1)).sum()
+        return tp / (tp + fp)
+    
+    def _recall(self, y_true, y_pred):
+        y_pred = (y_pred > 0.5).astype(int)
+        tp = ((y_true == 1) & (y_pred == 1)).sum()
+        fn = ((y_true == 1) & (y_pred == 0)).sum()
+        return tp / (tp + fn)
+        
+    def _accuracy(self, y_true, y_pred):
+        y_pred = (y_pred > 0.5).astype(int)
+        return (y_true == y_pred).mean()
+
+    def _f1(self, y_true, y_pred):
+        y_pred = (y_pred > 0.5).astype(int)
+        precision = self._precision(y_true, y_pred)
+        recall = self._recall(y_true, y_pred)
+        if precision + recall == 0:
+            return 0
+        return 2 * (precision * recall) / (precision + recall)
+
+    def _roc_auc(self, y_true, y_pred):
+        positives = np.sum(y_true == 1)
+        negatives = np.sum(y_true == 0)
+
+        y_pred = np.round(y_pred, 10)
+
+        sorted_idx = np.argsort(-y_pred)
+        y_sorted = np.array(y_true)[sorted_idx]
+        y_prob_sorted = y_pred[sorted_idx]
+
+        roc_auc_score = 0
+
+        for prob, pred in zip(y_prob_sorted, y_sorted):
+            if pred == 0:
+                roc_auc_score += (
+                    np.sum(y_sorted[y_prob_sorted > prob])
+                    + np.sum(y_sorted[y_prob_sorted == prob]) / 2
+                )
+
+        roc_auc_score /= positives * negatives
+
+        return roc_auc_score
+
     def fit(self, X: pd.DataFrame, y: pd.Series):
         random.seed(self.random_state)
         init_cols = list(X.columns)
@@ -56,12 +103,31 @@ class MyForestClf:
             # Делаем предсказание для OOB-образцов текущего дерева
             if oob_rows:
                 X_oob = X.iloc[oob_rows][cols_idx]
-                y_oob_pred = tree.predict(X_oob)
+                y_oob_pred = tree.predict_proba(X_oob)
                 
                 for i, idx in enumerate(oob_rows):
                     self.oob_predictions[idx] += y_oob_pred[i]
-                    self.oob_counts[idx] += 1
-                  
+                    self.oob_counts[idx] += 1       
+
+        # Усредняем OOB-предсказания и вычисляем метрику
+        if self.oob_score:
+            valid_indices = [i for i in self.oob_counts if self.oob_counts[i] > 0]
+            if not valid_indices:
+                self.oob_score_ = None
+                return
+
+            y_true = y.iloc[valid_indices]
+            y_pred = np.array([self.oob_predictions[i] / self.oob_counts[i] for i in valid_indices])
+
+            # Проверка на NaN/Inf (дополнительная защита)
+            mask = np.isfinite(y_pred) & np.isfinite(y_true)
+            y_true = y_true[mask]
+            y_pred = y_pred[mask]
+            if len(y_true) == 0:
+                self.oob_score_ = None
+                return
+
+            self.oob_score_ = getattr(self, f'_{self.oob_score}')(y_true, y_pred)             
 
     def predict(self, X: pd.DataFrame, type: str):
         if type == 'mean':
@@ -90,7 +156,7 @@ X = pd.DataFrame(X)
 y = pd.Series(y)
 X.columns = [f'col_{col}' for col in X.columns]
 
-forest = MyForestClf(n_estimators=6, max_depth=2, max_features=0.6, max_samples=0.5)            
+forest = MyForestClf(n_estimators=6, max_depth=2, max_features=0.6, max_samples=0.5, oob_score='accuracy')            
 forest.fit(X, y)
 print(forest.predict(X, type='vote'))
 
