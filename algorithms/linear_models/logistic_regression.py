@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import random
 
-class LogReg():
+class MyLogReg():
     def __init__(self, n_iter: int = 100,
                learning_rate: object = 0.1,
                metric: str = None,
@@ -23,149 +23,150 @@ class LogReg():
         self.best_metric = 0.0
 
     def __str__(self):
-        return f'LogReg class: n_iter={self.n_iter}, learning_rate={self.learning_rate}'    
+        return f'LogReg class: n_iter={self.n_iter}, learning_rate={self.learning_rate}'   
     
-    def loss(self, loss: str = 'LogLoss', y: pd.Series = None, y_pred : pd.Series = None, n: int = 1) -> float  :
-        if loss == 'LogLoss':
-            return -1.0 / n * (y.dot(np.log(y_pred + 1e-5)) + (1-y).dot(np.log(1-y_pred + 1e-5))).sum()
-        
-    def gradient(self, loss: str = 'LogLoss', X: pd.DataFrame = None, y: pd.Series = None, y_pred: pd.Series = None) -> float:
-        if loss == 'LogLoss':
-            return (y_pred - y).dot(X) / X.shape[0] 
+    def _sigmoid(self, z):
+        return 1 / (1 + np.exp(-z)) 
     
-    def precision(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
-        y_pred = (y_pred > 0.5).astype(int)
-        tp = ((y == 1) & (y_pred == 1)).sum()
-        fp = ((y == 0) & (y_pred == 1)).sum()
-        return tp / (tp + fp)
+    def _add_intercept(self, X):
+        intercept = np.ones((X.shape[0], 1))
+        return np.concatenate((intercept, X), axis=1)
     
-    def recall(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
-        y_pred = (y_pred > 0.5).astype(int)
-        tp = ((y == 1) & (y_pred == 1)).sum()
+    def _get_learning_rate(self, iteration):
+        """Возвращает learning_rate для текущей итерации"""
+        if callable(self.learning_rate):
+            return self.learning_rate(iteration)
+        return self.learning_rate
+    
+    def metric_marks(self, y, y_pred) -> list:
+        tp =  ((y == 1) & (y_pred == 1)).sum()  
+        tn = ((y == 0) & (y_pred == 0)).sum()
         fn = ((y == 1) & (y_pred == 0)).sum()
-        return tp / (tp + fn)
+        fp = ((y == 0) & (y_pred == 1)).sum()
+        return [tp, tn, fn, fp]
+
+    def calc_metric(self, metric: str = 'accuracy', y: pd.Series = None, y_pred: pd.Series = None):
+        labels = (y_pred > 0.5).astype(int)
+        tp, tn, fn, fp  = self.metric_marks(y, labels) # returns as following: [tp, tn, fn, fp] 
+        if metric == 'accuracy':
+            return (tp + tn) / (tp + tn + fp + fn)
+        elif metric == 'precision':
+            return tp / (tp + fp)
+        elif metric == 'recall':
+            return tp / (tp + fn)
+        elif metric == 'f1':
+            precision = tp / (tp + fp)
+            recall = tp / (tp + fn)
+            return 2 * precision * recall / (precision + recall)
+        elif metric == 'roc_auc':
+            positives = np.sum(y == 1)
+            negatives = np.sum(y == 0)
+
+            y_pred = np.round(y_pred, 10)
+
+            sorted_idx = np.argsort(-y_pred)
+            y_sorted = np.array(y)[sorted_idx]
+            y_prob_sorted = y_pred[sorted_idx]
+
+            roc_auc_score = 0
+
+            for prob, pred in zip(y_prob_sorted, y_sorted):
+                if pred == 0:
+                    roc_auc_score += (
+                        np.sum(y_sorted[y_prob_sorted > prob])
+                        + np.sum(y_sorted[y_prob_sorted == prob]) / 2
+                    )
+
+            roc_auc_score /= positives * negatives
+
+            return roc_auc_score 
         
-    def accuracy(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
-        y_pred = (y_pred > 0.5).astype(int)
-        return (y == y_pred).mean()
-    
-    def f1(self, y_true: pd.Series = None, y_pred: pd.Series = None) -> float:
-        precision = self._precision(y_true, y_pred)
-        recall = self._recall(y_true, y_pred)
-        if precision + recall == 0:
-            return 0
-        return 2 * (precision * recall) / (precision + recall)
-
-    def roc_auc(self, y: pd.Series = None, y_pred: pd.Series = None) -> float:
-        y_pred = y_pred.round(10)
-        df = pd.concat([y_pred, y], axis=1)
-        df = df.sort_values(by=0, ascending=False)
-        positives = df[df[1] == 1]
-        negatives = df[df[1] == 0]
-        total = 0
-        for current_score in negatives[0]:
-            score_higher = (positives[0] > current_score).sum()
-            score_equal = (positives[0] == current_score).sum()
-            total += score_higher + 0.5 * score_equal
-        return total / (positives.shape[0] * negatives.shape[0])    
-    
-    def calc_reg(self, weights) -> float:
-        """Подсчет регуляризации"""
-        if self.reg == 'l1':
-            reg_loss = self.l1_coef * np.sum(np.absolute(weights))
-            reg_grad = self.l1_coef * np.sign(weights)
-        elif self.reg == 'l2':
-            reg_loss = self.l2_coef * np.sum(np.power(weights, 2))
-            reg_grad = self.l2_coef * 2 * weights
-        elif self.reg == 'elasticnet':
-            reg_loss = self.l1_coef * np.sum(np.absolute(weights)) + self.l2_coef * np.sum(np.power(weights, 2))
-            reg_grad = self.l1_coef * np.sign(weights) + self.l2_coef * 2 * weights
-        return reg_loss, reg_grad
-
-    """Обучение"""
-    def fit(self, X: pd.DataFrame, y: pd.Series, verbose: object = False):
+    def fit(self, X: pd.DataFrame, y: pd.Series, verbose=False):
         random.seed(self.random_seed)
-        X.insert(0, 'w0', 1.0)
-        num_observations, num_features = X.shape
-        weights = np.ones(num_features)
-
-        """Подбор batch_size"""
-        if self.sgd_sample:
-            if isinstance(self.sgd_sample, float):
-                batch_size = int(X.shape[0] * self.sgd_sample)
-            elif isinstance(self.sgd_sample, int):
-                batch_size = self.sgd_sample
-            num_observations = batch_size
-        else:
-            batch_size = num_observations
-
-        """Обучение"""
-        for i in range(1, self.n_iter+1):
-            sample_rows_idx = random.sample(range(X.shape[0]), batch_size)
-            X_batch = X.iloc[sample_rows_idx]
-            y_batch = y.iloc[sample_rows_idx]
-            y_pred = 1 / (1 + np.exp(-X.dot(weights)))
+        
+        X = X.values
+        y = y.values
+        n_samples = X.shape[0]
+        
+        # Добавляем единичный столбец для intercept
+        X = self._add_intercept(X)
+        
+        # Инициализируем веса единицами
+        weights = np.ones(X.shape[1])
+        
+        eps = 1e-15
+        for i in range(1, self.n_iter + 1):
+            current_lr = self._get_learning_rate(i)
             
-            y_pred_batch = 1 / (1 + np.exp(-X_batch.dot(weights)))
-
-            """Регуляризация"""
-            reg_loss, reg_grad = 0.0, 0.0
+            # Выбираем мини-пакет
+            sample_rows_idx = range(n_samples)
+            batch_size = self.sgd_sample if self.sgd_sample else n_samples
+            if isinstance(batch_size, float):
+                batch_size = int(n_samples * batch_size)
+            sample_idx = random.sample(range(n_samples), batch_size)
+            X_batch = X[sample_idx]
+            y_batch = y[sample_idx]
+            
+            z = np.dot(X_batch, weights)
+            y_pred_batch = self._sigmoid(z)
+            
+            gradient = np.dot(X_batch.T, (y_pred_batch - y_batch)) / len(y_batch)
+            
+            y_pred_full = self._sigmoid(np.dot(X, weights))
+            log_loss = -np.mean(y * np.log(y_pred_full + eps) + (1 - y) * np.log(1 - y_pred_full + eps))
             if self.reg:
-                reg_loss, reg_grad = self.calc_reg(weights)
-
-            """Проверка скорости обучения"""
-            if callable(self.learning_rate):
-                lr = self.learning_rate(i)
-            else:
-                lr = self.learning_rate    
-
-            """Расчет градиента и обновление весов"""
-            loss = self.loss('LogLoss', y, y_pred, num_observations) + reg_loss
-            grad = self.gradient('LogLoss', X_batch, y_batch, y_pred_batch) + reg_grad
-            weights = weights - lr*grad
+                if self.reg == 'l1' or self.reg == 'elasticnet':
+                    gradient += self.l1_coef * np.sign(weights)
+                    log_loss += self.l1_coef * np.sum(np.abs(weights))
+                if self.reg == 'l2' or self.reg == 'elasticnet':
+                    gradient += self.l2_coef * 2 * weights
+                    log_loss += self.l2_coef * np.sum(weights ** 2)
+            
+            weights -= current_lr * gradient
             self.weights = weights
+            
+            # Вычисление функции потерь и метрики для лога
+            if verbose and i % verbose == 0:
+                y_pred_proba = self._sigmoid(np.dot(X, self.weights))
+                y_pred = (y_pred_proba >= 0.5).astype(int)
 
-            """Вывод логов"""
-            if verbose and (i == 1 or (i % verbose) == 0):
-                print(f'{i}| loss: {loss}', end= '')
+                if verbose and (i == 1 or (i % verbose) == 0):
+                    print(f'{i}| loss: {log_loss}', end= '')
                 if self.metric:
-                    metr = getattr(self, f'{self.metric}')(y, y_pred)
+                    metr = self.calc_metric(self.metric, y, y_pred)
                     print(f'| {self.metric}: {metr}')
-        if self.metric:
-            y_pred = 1 / (1 + np.exp(-X.dot(weights)))
-            self.best_metric = getattr(self, f'{self.metric}')(y, y_pred)     
+        y_pred = 1 / (1 + np.exp(-X.dot(weights)))
+        metr = self.calc_metric(self.metric, y, y_pred)     
+        self.best_metric = metr   
     
-    def get_coef(self) -> np.array:
-        """Вектор весов без первого параметра"""
+    def get_coef(self):
         return self.weights[1:]   
-
-    def predict_proba(self, X: pd.DataFrame = None) -> pd.Series: 
-        if X.shape[1] != self.weights.shape[0]:
-            X.insert(0, 'w0', 1.0)
-        return  1 / (1 + np.exp(-X.dot(self.weights)))
     
-    def predict(self, X: pd.DataFrame = None) -> pd.Series:
-        proba = self.predict_proba(X)
-        return (proba > 0.5).astype(int)  
-
     def get_best_score(self):
-        return self.best_metric  
-
-"""Данные для тестов"""
+        return self.best_metric         
+                
+    def predict_proba(self, X: pd.DataFrame):
+        # Проверяем, что модель обучена
+        if self.weights is None:
+            raise ValueError("Модель не обучена. Сначала вызовите fit().") 
+        X = X.values
+        X = self._add_intercept(X)
+        z = np.dot(X, self.weights)
+        return self._sigmoid(z)
+    
+    def predict(self, X, threshold=0.5):
+        proba = self.predict_proba(X)  
+        return (proba >= threshold).astype(int)         
+    
+    
 from sklearn.datasets import make_classification
+    
+X, y = make_classification(n_samples=10, n_features=14, n_informative=10, random_state=42)
+X = pd.DataFrame(X)
+y = pd.Series(y)
+X.columns = [f'col_{col}' for col in X.columns]
 
-X, y = make_classification(n_samples=300, n_features=5, n_informative=2, random_state=42)
-X_train = pd.DataFrame(X[:200])
-y_train = pd.Series(y[:200])
-X_train.columns = [f'col_{col}' for col in X_train.columns]
-
-X_test = pd.DataFrame(X[201:])
-X_test.columns = [f'col_{col}' for col in X_test.columns]   
-
-reg = LogReg(n_iter=100, learning_rate=lambda iter: 0.5 * (0.85 ** iter), metric='recall', sgd_sample=0.1)
-reg.fit(X_train, y_train, verbose=10)
-print(reg.predict(X_test).sum())
-
-
+logreg = MyLogReg(learning_rate=lambda iter: 0.5 * (0.85 ** iter), n_iter=10, metric='roc_auc', reg='l1')
+logreg.fit(X, y, verbose=1)
         
 

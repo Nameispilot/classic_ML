@@ -3,7 +3,8 @@ import numpy as np
 import random
 from sklearn.datasets import make_regression
 
-class LineReg():
+
+class MyLineReg():
   """
     Линейная регрессия
 
@@ -140,8 +141,8 @@ class LineReg():
 
   def predict(self, X: pd.DataFrame):
     """Выдача предсказания после обучение"""
-    if X.shape[1] != self.weights.shape[0]:
-            X.insert(0, 'w0', 1.0)
+    ones = np.ones((X.shape[0], 1))
+    X = np.hstack((ones, X))
     return X.dot(self.weights)
 
   def get_coef(self) -> np.array:
@@ -151,17 +152,3 @@ class LineReg():
   def get_best_score(self):
     """Метрика после обучения"""
     return self.best_metric
-
-"""Данные для тестов"""
-from sklearn.datasets import make_regression
-X, y = make_regression(n_samples=300, n_features=5, n_informative=2, random_state=42)
-X_train = pd.DataFrame(X[:200])
-y_train = pd.Series(y[:200])
-X_train.columns = [f'col_{col}' for col in X_train.columns]
-
-X_test = pd.DataFrame(X[201:])
-X_test.columns = [f'col_{col}' for col in X_test.columns]
-
-reg = LineReg(n_iter=100, learning_rate=lambda iter: 0.5 * (0.85 ** iter), metric='mse', sgd_sample=0.1)
-reg.fit(X_train, y_train, verbose=10)
-print(reg.predict(X_test).sum())

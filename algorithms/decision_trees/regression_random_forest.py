@@ -16,8 +16,6 @@ class MyForestReg:
         self.bins = bins
         self.oob_score = oob_score
         self.oob_score_ = None
-        self.oob_predictions = {}  # Словарь для хранения OOB-предсказаний каждого дерева
-        self.oob_counts = {}       # Счетчик, сколько раз каждый образец был OOB
 
         self.forest_structure = []
         self.leafs_cnt = 0

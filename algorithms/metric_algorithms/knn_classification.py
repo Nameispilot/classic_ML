@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
-import scipy.spatial
 
-class KNNClf:
+class MyKNNClf:
     def __init__(self, k: int = 3, metric: str = 'euclidean', weight: str = 'uniform'):
         self.k = k
         self.train_size = 0
@@ -55,17 +54,3 @@ class KNNClf:
         
     def predict_proba(self, test: pd.DataFrame):
         return test.apply(self._calc_row, axis=1)
-
-from sklearn.datasets import make_classification
-X, y = make_classification(n_samples=300, n_features=5, n_informative=2, random_state=42)
-X_train = pd.DataFrame(X[:200])
-y_train = pd.Series(y[:200])
-X_train.columns = [f'col_{col}' for col in X_train.columns]
-
-X_test = pd.DataFrame(X[201:])
-X_test.columns = [f'col_{col}' for col in X_test.columns]
-
-knn_clf = KNNClf(5, 'cosine', 'distance')
-knn_clf.fit(X_train, y_train)
-print(knn_clf.predict(X_test).sum()) 
-print(knn_clf.predict_proba(X_test).sum()) 

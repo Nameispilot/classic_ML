@@ -10,8 +10,8 @@ class Node:
         self.left = None
         self.right = None
 
-class TreeClf:
-    def __init__(self, max_depth: int=5, min_samples_split: int=2, max_leafs: int=20, bins=None, criterion: str='entropy'):
+class MyTreeClf:
+    def __init__(self, max_depth: int=5, min_samples_split: int=2, max_leafs: int=20, bins=None, criterion: str='entropy', **kwargs):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.max_leafs = max_leafs
@@ -23,7 +23,7 @@ class TreeClf:
         self.leafs_cnt = 1
         self.fi = {}
         self.sum_tree_values = 0
-        self.N = 0
+        self.N = kwargs['N'] if 'N' in kwargs else 0
 
     def __str__(self):
         return f'TreeClf class: max_depth={self.max_depth}, min_samples_split={self.min_samples_split}, max_leafs={self.max_leafs}, bins={self.bins}, criterion={self.criterion}'    
@@ -113,13 +113,10 @@ class TreeClf:
                 _, bin_edges = np.histogram(X.iloc[:, feature], bins=self.bins)
                 self.feature_splits[feature] = bin_edges[1:-1] # Исключаем крайние значения
 
-    def fit(self, X: pd.DataFrame, y: pd.Series, N):
+    def fit(self, X: pd.DataFrame, y: pd.Series):
         self.tree = None
-        self.N = X.shape[0]
         if self.N == None:
             self.N = X.shape[0]
-        else:
-            self.N = N
         self.fi = { col: 0 for col in X.columns }
         if self.bins is not None:
              self._calculate_feature_splits(X)

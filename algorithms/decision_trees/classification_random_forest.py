@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import random
-from classification_decision_tree import TreeClf
+from classification_decision_tree import MyTreeClf
 
 class MyForestClf:
     def __init__(self, n_estimators:int=10, max_features:float=0.5, max_samples:float=0.5, random_state:int=42, \
@@ -93,8 +93,8 @@ class MyForestClf:
             rows_idx = random.sample(range(init_rows_cnt), rows_smpl_cnt)
             oob_rows = [i for i in range(init_rows_cnt) if i not in rows_idx]
 
-            tree = TreeClf(self.max_depth, self.min_samples_split, self.max_leafs, self.bins)
-            tree.fit(X.loc[rows_idx, cols_idx], y[rows_idx], N)
+            tree = MyTreeClf(self.max_depth, self.min_samples_split, self.max_leafs, self.bins, N=N)
+            tree.fit(X.loc[rows_idx, cols_idx], y[rows_idx])
 
             self.forest_structure.append(tree)
             self.fi = {key: tree.fi.get(key, 0) + self.fi.get(key, 0) for key in set(tree.fi) | set(self.fi)}

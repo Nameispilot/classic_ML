@@ -10,7 +10,7 @@ class Node:
         self.left = None
         self.right = None
 
-class TreeReg :
+class MyTreeReg:
     def __init__(self, max_depth:int=5, min_samples_split:int=2, max_leafs:int=20, bins=None):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split

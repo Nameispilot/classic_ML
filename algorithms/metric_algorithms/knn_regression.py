@@ -54,7 +54,7 @@ class MyKNNReg():
     def predict(self, test: pd.DataFrame):
         return test.apply(lambda row: self._calc_row(row), axis=1)
 
-from sklearn.datasets import make_regression
+'''from sklearn.datasets import make_regression
 X, y = make_regression(n_samples=300, n_features=5, n_informative=2, random_state=42)
 X_train = pd.DataFrame(X[:200])
 y_train = pd.Series(y[:200])
@@ -65,7 +65,7 @@ X_test.columns = [f'col_{col}' for col in X_test.columns]
 
 knn_clf = MyKNNReg(k=5, metric='chebyshev')
 knn_clf.fit(X_train, y_train)
-print(knn_clf.predict(X_test).sum()) 
+print(knn_clf.predict(X_test).sum()) '''
 
 
 
